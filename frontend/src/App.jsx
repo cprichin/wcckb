@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ConfirmEmail from './pages/ConfirmEmail';
 import TicketList from './pages/TicketList';
 import NewTicket from './pages/NewTicket';
 import TicketDetail from './pages/TicketDetail';
@@ -26,6 +27,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/confirm-email" element={<ConfirmEmail />} />
           <Route path="/tickets" element={<PrivateRoute><TicketList /></PrivateRoute>} />
           <Route path="/tickets/new" element={<PrivateRoute><NewTicket /></PrivateRoute>} />
           <Route path="/tickets/:id" element={<PrivateRoute><TicketDetail /></PrivateRoute>} />

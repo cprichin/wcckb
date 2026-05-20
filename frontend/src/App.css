@@ -193,6 +193,17 @@ input:focus, textarea:focus, select:focus { border-color: #3b82f6; background: #
 .btn-link:hover { text-decoration: underline; }
 .delete-confirm { font-size: 13px; color: #374151; }
 
+/* ── Email Confirmation ── */
+.confirm-box { text-align: center; }
+.confirm-icon { font-size: 48px; margin-bottom: 16px; }
+.confirm-box h1 { font-size: 22px; margin-bottom: 12px; }
+.confirm-body { color: #64748b; line-height: 1.6; margin-bottom: 10px; }
+.confirm-cta { margin-top: 24px; }
+.confirmed-badge { background: #f0fdf4; color: #16a34a; padding: 3px 10px;
+  border-radius: 20px; font-size: 12px; font-weight: 600; }
+.pending-badge { background: #fffbeb; color: #d97706; padding: 3px 10px;
+  border-radius: 20px; font-size: 12px; font-weight: 600; }
+
 /* ── Misc ── */
 .loading-screen { height: 100vh; display: flex; align-items: center; justify-content: center;
   font-size: 16px; color: #94a3b8; }

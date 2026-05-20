@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role        VARCHAR(20) NOT NULL DEFAULT 'user', -- 'user', 'agent', 'admin'
   department  VARCHAR(100),
+  email_confirmed         BOOLEAN     NOT NULL DEFAULT FALSE,
+  confirmation_token      TEXT        UNIQUE,
+  confirmation_expires_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -89,10 +92,11 @@ CREATE TRIGGER kb_articles_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Seed: default admin account (password: admin1234 — CHANGE THIS)
-INSERT INTO users (name, email, password_hash, role)
+INSERT INTO users (name, email, password_hash, role, email_confirmed)
 VALUES (
   'Admin',
-  'cprichinello3@gmail.com',
-  '$2a$10$Uy8KLrvC./HVW0Xw3v2c1eoU30jn/A0lvhDxUZFKJVZngiN4pbV7u',
-  'admin'
+  'admin@helpdesk.local',
+  '$2a$10$wqVQ1q5c3wRqiQqHLjk9/.hBb9CfE3dQ0PgwBUmRVq3VpWIQAn4dS',
+  'admin',
+  TRUE
 ) ON CONFLICT DO NOTHING;

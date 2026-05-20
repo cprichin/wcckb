@@ -132,6 +132,7 @@ export default function AdminUsers() {
                 <th>Email</th>
                 <th>Department</th>
                 <th>Role</th>
+                <th>Confirmed</th>
                 <th>Joined</th>
                 <th>Actions</th>
               </tr>
@@ -163,8 +164,12 @@ export default function AdminUsers() {
                       </select>
                     )}
                   </td>
-                  <td className="muted">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td>
+                    {u.email_confirmed
+                      ? <span className="confirmed-badge">✓ Confirmed</span>
+                      : <span className="pending-badge">⏳ Pending</span>}
+                  </td>
+                  <td className="muted">{new Date(u.created_at).toLocaleDateString()}</td>                  <td>
                     {u.id !== me?.id && (
                       deleteConfirm === u.id ? (
                         <span className="delete-confirm">

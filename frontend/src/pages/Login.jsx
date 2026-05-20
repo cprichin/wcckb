@@ -17,7 +17,12 @@ export default function Login() {
       const user = await login(form.email, form.password);
       navigate(user.role === 'user' ? '/tickets' : '/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      const data = err.response?.data;
+      if (data?.unconfirmed) {
+        setError('Your email address hasn\'t been confirmed yet. Please check your inbox for the confirmation link.');
+      } else {
+        setError(data?.error || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
