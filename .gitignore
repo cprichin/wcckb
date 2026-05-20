@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment secrets — NEVER commit these
+.env
+
+# Docker volumes / build artifacts
+postgres_data/
+uploads/
+
+# React build output
+frontend/build/
+
+# OS junk
+.DS_Store
+Thumbs.db
