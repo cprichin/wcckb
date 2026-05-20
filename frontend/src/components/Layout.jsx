@@ -30,6 +30,9 @@ export default function Layout({ children }) {
               👥 Users
             </NavLink>
           )}
+          <NavLink to="/account" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            👤 My Account
+          </NavLink>
         </div>
         <div className="sidebar-footer">
           <div className="user-info">

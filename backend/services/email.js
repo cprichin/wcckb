@@ -1,26 +1,33 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
+  logger: true,
+  debug: true,
   host: process.env.SMTP_HOST || 'localhost',
   port: parseInt(process.env.SMTP_PORT) || 25,
   secure: process.env.SMTP_SECURE === 'true', // true for port 465, false for 25/587
 
-  auth: process.env.SMTP_USER
+  auth:
+  process.env.SMTP_USER && process.env.SMTP_PASS
     ? {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       }
-    : undefined, // no auth needed for local SMTP relay
+    : undefined,
 
-  tls: {
-    // Allow self-signed certs on local mail servers
-    rejectUnauthorized:
-      process.env.SMTP_REJECT_UNAUTHORIZED !== 'false'
-        ? false
-        : true,
-  },
+ tls: {
+  rejectUnauthorized:
+    process.env.SMTP_REJECT_UNAUTHORIZED === 'true',
+},
 });
-
+transporter.verify((err, success) => {
+  if (err) {
+    console.error('SMTP VERIFY FAILED');
+    console.error(err);
+  } else {
+    console.log('SMTP SERVER READY');
+  }
+});
 /**
  * Send an email confirmation link to a newly registered user.
  * @param {string} toEmail - Recipient email address
@@ -34,7 +41,7 @@ async function sendConfirmationEmail(toEmail, toName, token) {
 
   // Build sender from separate env vars
   const smtpName = process.env.SMTP_NAME || 'HelpDesk';
-  const smtpEmail = process.env.SMTP_EMAIL || 'helpdesk@localhost';
+  const smtpEmail = process.env.SMTP_EMAIL || 'helpdesk@fastmanacollective.com';
 
   const html = `
     <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; color: #1e293b;">
@@ -114,4 +121,4 @@ If you didn't create this account, ignore this email.`,
   });
 }
 
-module.exports = { sendConfirmationEmail };
+module.exports = { sendConfirmationEmail }; 

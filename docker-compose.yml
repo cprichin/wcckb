@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
 
   db:
@@ -18,6 +16,16 @@ services:
       timeout: 5s
       retries: 5
 
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      REACT_APP_API_URL: ${API_URL:-http://localhost:4000/api}
+    ports:
+      - "3000:80"
   backend:
     build: ./backend
     restart: unless-stopped
@@ -33,21 +41,18 @@ services:
       JWT_SECRET: ${JWT_SECRET:-changeme_secret}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       PORT: 4000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: false
+      SMTP_USER: fastmanacollective@gmail.com
+      SMTP_PASS: "hwdfuyspuwocffcc"
+
+      SMTP_NAME: HelpDesk
+      SMTP_EMAIL: helpdesk@fastmanacollective.com
     volumes:
       - uploads_data:/app/uploads
     ports:
       - "4000:4000"
-
-  frontend:
-    build: ./frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      REACT_APP_API_URL: ${API_URL:-http://localhost:4000/api}
-    ports:
-      - "3000:80"
-
 volumes:
   postgres_data:
   uploads_data:

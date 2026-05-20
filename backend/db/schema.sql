@@ -95,8 +95,8 @@ CREATE TRIGGER kb_articles_updated_at
 INSERT INTO users (name, email, password_hash, role, email_confirmed)
 VALUES (
   'Admin',
-  'admin@helpdesk.local',
-  '$2a$10$wqVQ1q5c3wRqiQqHLjk9/.hBb9CfE3dQ0PgwBUmRVq3VpWIQAn4dS',
+  'chris@fastmanacollective.com',
+  '$2a$10$QfErgPwwUNYye8I/W7K7g.WGkUvfNsaEE02udXSfjBb97.VRmiOK.',
   'admin',
   TRUE
 ) ON CONFLICT DO NOTHING;

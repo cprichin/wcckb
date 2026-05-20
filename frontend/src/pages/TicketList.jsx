@@ -28,7 +28,7 @@ export default function TicketList() {
     api.get('/tickets').then(res => setTickets(res.data)).finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'all' ? tickets : tickets.filter(t => t.status === filter);
+  const filtered = filter === 'all' ? tickets.filter(t => t.status !== 'closed') : tickets.filter(t => t.status === filter);
 
   return (
     <div className="page">

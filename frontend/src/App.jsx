@@ -10,6 +10,7 @@ import TicketDetail from './pages/TicketDetail';
 import { KBList } from './pages/KB';
 import { KBDetail, KBEditor } from './pages/KBDetail';
 import AdminUsers from './pages/AdminUsers';
+import MyAccount from './pages/MyAccount';
 import './App.css';
 
 function PrivateRoute({ children, roles }) {
@@ -27,6 +28,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/account" element={<PrivateRoute><MyAccount /></PrivateRoute>} />
           <Route path="/confirm-email" element={<ConfirmEmail />} />
           <Route path="/tickets" element={<PrivateRoute><TicketList /></PrivateRoute>} />
           <Route path="/tickets/new" element={<PrivateRoute><NewTicket /></PrivateRoute>} />
