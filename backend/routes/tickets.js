@@ -4,6 +4,14 @@ const { authenticate, authorize } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { autoAssign } = require('../services/assignments');
+const {
+  notifyTicketCreated,
+  notifyTicketAssigned,
+  notifyStatusChanged,
+  notifyTicketClosed,
+  notifyCommentAdded,
+} = require('../services/notifications');
 
 // File upload config
 const storage = multer.diskStorage({
@@ -109,37 +117,94 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'title and description are required' });
 
   try {
+    // Auto-assign to the agent/admin with the lightest active workload
+    const assigneeId = await autoAssign();
+
     const result = await db.query(
-      `INSERT INTO tickets (title, description, priority, category, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO tickets (title, description, priority, category, created_by, assigned_to)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [title, description, priority || 'medium', category || null, req.user.id]
+      [title, description, priority || 'medium', category || null, req.user.id, assigneeId]
     );
-    res.status(201).json(result.rows[0]);
+    const ticket = result.rows[0];
+
+    // Fetch all confirmed agents/admins for the creation broadcast
+    const agentsResult = await db.query(
+      `SELECT id, name, email FROM users
+       WHERE role IN ('agent', 'admin') AND email_confirmed = TRUE`
+    );
+    const agents = agentsResult.rows;
+
+    // Notify all agents/admins of the new ticket (fire-and-forget)
+    notifyTicketCreated(ticket, req.user.name, agents).catch(console.error);
+
+    // Notify the assigned agent specifically (skip if no assignee)
+    if (assigneeId) {
+      const assignee = agents.find(a => a.id === assigneeId) || null;
+      if (assignee) {
+        notifyTicketAssigned(ticket, assignee, req.user.name).catch(console.error);
+      }
+    }
+
+    res.status(201).json(ticket);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 // PATCH /api/tickets/:id — update ticket (agents/admins)
 router.patch('/:id', authenticate, authorize('agent', 'admin'), async (req, res) => {
   const { id } = req.params;
   const { status, priority, category, assigned_to } = req.body;
   try {
-    const resolved_at = status === 'resolved' ? 'NOW()' : null;
+    // Fetch current ticket state before update (needed for change detection)
+    const before = await db.query(`SELECT * FROM tickets WHERE id = $1`, [id]);
+    if (!before.rows.length) return res.status(404).json({ error: 'Ticket not found' });
+    const oldTicket = before.rows[0];
+
     const result = await db.query(
       `UPDATE tickets SET
-        status = COALESCE($1, status),
-        priority = COALESCE($2, priority),
-        category = COALESCE($3, category),
+        status      = COALESCE($1, status),
+        priority    = COALESCE($2, priority),
+        category    = COALESCE($3, category),
         assigned_to = COALESCE($4, assigned_to),
         resolved_at = CASE WHEN $5 THEN NOW() ELSE resolved_at END
        WHERE id = $6 RETURNING *`,
       [status, priority, category, assigned_to, status === 'resolved', id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: 'Ticket not found' });
-    res.json(result.rows[0]);
+    const ticket = result.rows[0];
+
+    // ── Fetch people we may need to notify ──────────────────────────────────
+    const [creatorResult, assigneeResult] = await Promise.all([
+      db.query(`SELECT id, name, email FROM users WHERE id = $1`, [ticket.created_by]),
+      ticket.assigned_to
+        ? db.query(`SELECT id, name, email FROM users WHERE id = $1`, [ticket.assigned_to])
+        : Promise.resolve({ rows: [] }),
+    ]);
+    const creator  = creatorResult.rows[0]  || null;
+    const assignee = assigneeResult.rows[0] || null;
+
+    // ── Fire notifications (all fire-and-forget) ─────────────────────────────
+
+    // Status changed
+    if (status && status !== oldTicket.status) {
+      if (status === 'closed') {
+        // Closed: notify creator + assignee via dedicated function
+        notifyTicketClosed(ticket, creator, assignee).catch(console.error);
+      } else {
+        // Any other status transition: notify creator
+        notifyStatusChanged(ticket, creator, oldTicket.status).catch(console.error);
+      }
+    }
+
+    // Assignment changed (manual re-assign by admin)
+    if (assigned_to && assigned_to !== oldTicket.assigned_to) {
+      // Fetch the creator's name for the assignment email context
+      const creatorName = creator?.name || 'a user';
+      notifyTicketAssigned(ticket, assignee, creatorName).catch(console.error);
+    }
+
+    res.json(ticket);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -152,15 +217,51 @@ router.post('/:id/comments', authenticate, async (req, res) => {
   const { body, is_internal } = req.body;
   if (!body) return res.status(400).json({ error: 'body is required' });
 
-  // Only agents/admins can post internal notes
   const internal = is_internal && ['agent', 'admin'].includes(req.user.role);
+
   try {
     const result = await db.query(
       `INSERT INTO ticket_comments (ticket_id, user_id, body, is_internal)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [id, req.user.id, body, internal]
     );
-    res.status(201).json(result.rows[0]);
+    const comment = result.rows[0];
+
+    // Only send notifications for public comments
+    if (!internal) {
+      // Fetch ticket + involved users in parallel
+      const [ticketResult, creatorResult] = await Promise.all([
+        db.query(`SELECT * FROM tickets WHERE id = $1`, [id]),
+        db.query(
+          `SELECT u.id, u.name, u.email FROM tickets t
+           JOIN users u ON u.id = t.created_by
+           WHERE t.id = $1`, [id]
+        ),
+      ]);
+
+      const ticket  = ticketResult.rows[0];
+      const creator = creatorResult.rows[0] || null;
+
+      let assignee = null;
+      if (ticket?.assigned_to) {
+        const ar = await db.query(
+          `SELECT id, name, email FROM users WHERE id = $1`, [ticket.assigned_to]
+        );
+        assignee = ar.rows[0] || null;
+      }
+
+      if (ticket) {
+        notifyCommentAdded(
+          ticket,
+          comment,
+          { id: req.user.id, name: req.user.name, role: req.user.role, email: req.user.email },
+          creator,
+          assignee
+        ).catch(console.error);
+      }
+    }
+
+    res.status(201).json(comment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

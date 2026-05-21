@@ -22,9 +22,11 @@ export default function Layout({ children }) {
           <NavLink to="/tickets" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             🎟 Tickets
           </NavLink>
+          {isAgent && (
           <NavLink to="/kb" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             📚 Knowledge Base
           </NavLink>
+          )}
           {user?.role === 'admin' && (
             <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               👥 Users

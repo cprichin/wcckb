@@ -121,4 +121,4 @@ If you didn't create this account, ignore this email.`,
   });
 }
 
-module.exports = { sendConfirmationEmail }; 
+module.exports = { transporter, sendConfirmationEmail }; 
