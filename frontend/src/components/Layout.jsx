@@ -19,6 +19,11 @@ export default function Layout({ children }) {
           <span>HelpDesk</span>
         </div>
         <div className="sidebar-nav">
+          {isAgent && (
+            <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              📊 Dashboard
+            </NavLink>
+          )}
           <NavLink to="/tickets" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             🎟 Tickets
           </NavLink>

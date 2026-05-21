@@ -7,6 +7,7 @@ import ConfirmEmail from './pages/ConfirmEmail';
 import TicketList from './pages/TicketList';
 import NewTicket from './pages/NewTicket';
 import TicketDetail from './pages/TicketDetail';
+import Dashboard from './pages/Dashboard';
 import { KBList } from './pages/KB';
 import { KBDetail, KBEditor } from './pages/KBDetail';
 import AdminUsers from './pages/AdminUsers';
@@ -17,8 +18,20 @@ function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading-screen">Loading…</div>;
   if (!user) return <Navigate to="/login" />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/tickets" />;
+  if (roles && !roles.includes(user.role)) return <Navigate to={defaultRouteFor(user)} />;
   return <Layout>{children}</Layout>;
+}
+
+// Agents and admins land on the dashboard; regular users go straight to their tickets.
+function defaultRouteFor(user) {
+  return ['agent', 'admin'].includes(user?.role) ? '/dashboard' : '/tickets';
+}
+
+function DefaultRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="loading-screen">Loading…</div>;
+  if (!user) return <Navigate to="/login" />;
+  return <Navigate to={defaultRouteFor(user)} replace />;
 }
 
 function App() {
@@ -30,6 +43,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/account" element={<PrivateRoute><MyAccount /></PrivateRoute>} />
           <Route path="/confirm-email" element={<ConfirmEmail />} />
+          <Route path="/dashboard" element={<PrivateRoute roles={['agent','admin']}><Dashboard /></PrivateRoute>} />
           <Route path="/tickets" element={<PrivateRoute><TicketList /></PrivateRoute>} />
           <Route path="/tickets/new" element={<PrivateRoute><NewTicket /></PrivateRoute>} />
           <Route path="/tickets/:id" element={<PrivateRoute><TicketDetail /></PrivateRoute>} />
@@ -38,7 +52,7 @@ function App() {
           <Route path="/kb/:id" element={<PrivateRoute roles={['agent','admin']}><KBDetail /></PrivateRoute>} />
           <Route path="/kb/:id/edit" element={<PrivateRoute roles={['agent','admin']}><KBEditor /></PrivateRoute>} />
           <Route path="/admin/users" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
-          <Route path="*" element={<Navigate to="/tickets" />} />
+          <Route path="*" element={<DefaultRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

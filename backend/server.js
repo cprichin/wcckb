@@ -18,6 +18,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/kb', require('./routes/kb'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
