@@ -128,22 +128,26 @@ router.post('/', authenticate, async (req, res) => {
     );
     const ticket = result.rows[0];
 
-    // Fetch all confirmed agents/admins for the creation broadcast
-    const agentsResult = await db.query(
-      `SELECT id, name, email FROM users
-       WHERE role IN ('agent', 'admin') AND email_confirmed = TRUE`
-    );
-    const agents = agentsResult.rows;
+    // Fetch admins (broadcast recipients) and the assignee (targeted email) in parallel.
+    // Other agents are deliberately excluded — only the assignee should hear about it.
+    const [adminsResult, assigneeResult] = await Promise.all([
+      db.query(
+        `SELECT id, name, email FROM users
+         WHERE role = 'admin' AND email_confirmed = TRUE`
+      ),
+      assigneeId
+        ? db.query(`SELECT id, name, email FROM users WHERE id = $1`, [assigneeId])
+        : Promise.resolve({ rows: [] }),
+    ]);
+    const admins   = adminsResult.rows;
+    const assignee = assigneeResult.rows[0] || null;
 
-    // Notify all agents/admins of the new ticket (fire-and-forget)
-    notifyTicketCreated(ticket, req.user.name, agents).catch(console.error);
+    if (admins.length) {
+      notifyTicketCreated(ticket, req.user.name, admins).catch(console.error);
+    }
 
-    // Notify the assigned agent specifically (skip if no assignee)
-    if (assigneeId) {
-      const assignee = agents.find(a => a.id === assigneeId) || null;
-      if (assignee) {
-        notifyTicketAssigned(ticket, assignee, req.user.name).catch(console.error);
-      }
+    if (assignee) {
+      notifyTicketAssigned(ticket, assignee, req.user.name).catch(console.error);
     }
 
     res.status(201).json(ticket);

@@ -70,15 +70,17 @@ function metaTable(fields) {
 // ─── Notification functions ────────────────────────────────────────────────────
 
 /**
- * Notify all agents and admins when a new ticket is created.
- * Called immediately after ticket INSERT; assigned_to is already set by autoAssign.
+ * Send a "new ticket submitted" email to each recipient in the supplied list.
+ * The caller decides who hears about new tickets — typically admins only,
+ * since the auto-assigned agent gets a dedicated "assigned to you" email
+ * via notifyTicketAssigned.
  *
- * @param {Object} ticket  - Full ticket row from DB (including title, priority, category, id).
+ * @param {Object} ticket      - Full ticket row from DB (including title, priority, category, id).
  * @param {string} creatorName - Display name of the user who submitted the ticket.
- * @param {Array}  agents  - Array of { email, name } for all confirmed agents/admins.
+ * @param {Array}  recipients  - Array of { email, name } to notify.
  */
-async function notifyTicketCreated(ticket, creatorName, agents) {
-  if (!agents.length) return;
+async function notifyTicketCreated(ticket, creatorName, recipients) {
+  if (!recipients.length) return;
 
   const ticketUrl = `${BASE_URL}/tickets/${ticket.id}`;
 
@@ -101,12 +103,11 @@ async function notifyTicketCreated(ticket, creatorName, agents) {
     `Priority: ${ticket.priority}\n\n` +
     `View: ${ticketUrl}`;
 
-  // Send to all agents/admins in parallel
   await Promise.allSettled(
-    agents.map(agent =>
+    recipients.map(recipient =>
       transporter.sendMail({
         from: FROM,
-        to: `"${agent.name}" <${agent.email}>`,
+        to: `"${recipient.name}" <${recipient.email}>`,
         subject: `[HelpDesk] New ticket #${ticket.id}: ${ticket.title}`,
         html,
         text,
