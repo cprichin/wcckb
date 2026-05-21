@@ -47,6 +47,7 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+        <p className="auth-link"><Link to="/forgot-password">Forgot password?</Link></p>
         <p className="auth-link">No account? <Link to="/register">Register</Link></p>
       </div>
     </div>

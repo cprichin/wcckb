@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   email_confirmed         BOOLEAN     NOT NULL DEFAULT FALSE,
   confirmation_token      TEXT        UNIQUE,
   confirmation_expires_at TIMESTAMPTZ,
+  reset_token             TEXT        UNIQUE,
+  reset_expires_at        TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 

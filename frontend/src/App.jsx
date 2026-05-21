@@ -4,6 +4,8 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ConfirmEmail from './pages/ConfirmEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import TicketList from './pages/TicketList';
 import NewTicket from './pages/NewTicket';
 import TicketDetail from './pages/TicketDetail';
@@ -41,6 +43,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/account" element={<PrivateRoute><MyAccount /></PrivateRoute>} />
           <Route path="/confirm-email" element={<ConfirmEmail />} />
           <Route path="/dashboard" element={<PrivateRoute roles={['agent','admin']}><Dashboard /></PrivateRoute>} />

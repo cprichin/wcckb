@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { sendConfirmationEmail } = require('../services/email');
+const { sendConfirmationEmail, sendPasswordResetEmail } = require('../services/email');
 
 // Helper — generate a secure random token
 function generateToken() {
@@ -130,6 +130,99 @@ router.get('/me', authenticate, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/forgot — request a password-reset link
+// Always returns the same generic 200 so this endpoint can't be used to enumerate accounts.
+router.post('/forgot', async (req, res) => {
+  const { email } = req.body;
+  const generic = { message: 'If an account exists for that email, a password-reset link has been sent.' };
+
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  try {
+    const result = await db.query('SELECT id, name, email FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    // No user? Respond as if we sent the email anyway.
+    if (!user) return res.json(generic);
+
+    const token = generateToken();
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await db.query(
+      `UPDATE users SET reset_token = $1, reset_expires_at = $2 WHERE id = $3`,
+      [token, expires, user.id]
+    );
+
+    // Fire the email. If it fails, surface a 500 — the user needs to know to retry,
+    // and the token row stays valid until expiry / next request overwrites it.
+    try {
+      await sendPasswordResetEmail(user.email, user.name, token);
+    } catch (mailErr) {
+      console.error('Password reset email failed:', mailErr.message);
+      return res.status(500).json({ error: 'Could not send reset email. Please try again or contact an administrator.' });
+    }
+
+    res.json(generic);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/reset/:token — complete a password reset
+router.post('/reset/:token', async (req, res) => {
+  const { token } = req.params;
+  const { new_password } = req.body;
+
+  if (!new_password) return res.status(400).json({ error: 'new_password is required' });
+  if (new_password.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+
+  try {
+    const lookup = await db.query(
+      `SELECT id, email_confirmed FROM users
+       WHERE reset_token = $1 AND reset_expires_at > NOW()`,
+      [token]
+    );
+
+    if (!lookup.rows.length) {
+      // Distinguish expired vs. truly invalid so the UI can phrase it appropriately.
+      const expired = await db.query(
+        `SELECT id FROM users WHERE reset_token = $1`,
+        [token]
+      );
+      if (expired.rows.length) {
+        return res.status(410).json({ error: 'This password-reset link has expired. Please request a new one.' });
+      }
+      return res.status(404).json({ error: 'Invalid or already used reset link.' });
+    }
+
+    const { id, email_confirmed } = lookup.rows[0];
+    const hash = await bcrypt.hash(new_password, 10);
+
+    // Clear the reset token, set the new password, and auto-confirm the email
+    // since clicking the link proved ownership of the inbox.
+    await db.query(
+      `UPDATE users SET
+         password_hash = $1,
+         reset_token = NULL,
+         reset_expires_at = NULL,
+         email_confirmed = TRUE,
+         confirmation_token = CASE WHEN email_confirmed = FALSE THEN NULL ELSE confirmation_token END,
+         confirmation_expires_at = CASE WHEN email_confirmed = FALSE THEN NULL ELSE confirmation_expires_at END
+       WHERE id = $2`,
+      [hash, id]
+    );
+
+    res.json({
+      message: 'Password updated successfully. You can now log in.',
+      auto_confirmed: !email_confirmed,
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
