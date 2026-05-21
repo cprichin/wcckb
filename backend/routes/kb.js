@@ -12,9 +12,7 @@ router.get('/', authenticate, async (req, res) => {
                  FROM kb_articles WHERE 1=1`;
     const params = [];
 
-    if (!isAgent) {
-      query += ` AND is_public = TRUE`;
-    }
+    if (!isAgent) return res.status(403).json({ error: 'Forbidden' });
     if (category) {
       params.push(category);
       query += ` AND category = $${params.length}`;
@@ -43,7 +41,7 @@ router.get('/:id', authenticate, async (req, res) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Article not found' });
     const article = result.rows[0];
-    if (!article.is_public && req.user.role === 'user')
+    if (req.user.role === 'user')
       return res.status(403).json({ error: 'Forbidden' });
     res.json(article);
   } catch (err) {

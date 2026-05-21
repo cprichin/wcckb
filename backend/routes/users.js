@@ -107,5 +107,23 @@ router.patch('/:id/role', authenticate, authorize('admin'), async (req, res) => 
     res.status(500).json({ error: 'Server error' });
   }
 });
-
+// POST /api/users/:id/confirm — manually confirm a user's email (admin only)
+router.post('/:id/confirm', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE users SET
+         email_confirmed = TRUE,
+         confirmation_token = NULL,
+         confirmation_expires_at = NULL
+       WHERE id = $1
+       RETURNING id, name, email, role, email_confirmed`,
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 module.exports = router;

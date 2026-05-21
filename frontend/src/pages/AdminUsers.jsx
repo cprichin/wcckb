@@ -67,6 +67,14 @@ export default function AdminUsers() {
       alert(err.response?.data?.error || 'Failed to delete user');
     }
   };
+const handleConfirm = async (userId) => {
+  try {
+    await api.post(`/users/${userId}/confirm`);
+    load();
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to confirm user');
+  }
+};
 
   return (
     <div className="page">
@@ -169,20 +177,27 @@ export default function AdminUsers() {
                       ? <span className="confirmed-badge">✓ Confirmed</span>
                       : <span className="pending-badge">⏳ Pending</span>}
                   </td>
-                  <td className="muted">{new Date(u.created_at).toLocaleDateString()}</td>                  <td>
-                    {u.id !== me?.id && (
-                      deleteConfirm === u.id ? (
-                        <span className="delete-confirm">
-                          Sure?&nbsp;
-                          <button className="btn-link danger" onClick={() => handleDelete(u.id)}>Yes, delete</button>
-                          &nbsp;·&nbsp;
-                          <button className="btn-link" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-                        </span>
-                      ) : (
-                        <button className="btn-link danger" onClick={() => setDeleteConfirm(u.id)}>Delete</button>
-                      )
-                    )}
-                  </td>
+                 <td>
+  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    {!u.email_confirmed && (
+      <button className="btn-link" onClick={() => handleConfirm(u.id)}>
+        Confirm
+      </button>
+    )}
+    {u.id !== me?.id && (
+      deleteConfirm === u.id ? (
+        <span className="delete-confirm">
+          Sure?&nbsp;
+          <button className="btn-link danger" onClick={() => handleDelete(u.id)}>Yes, delete</button>
+          &nbsp;·&nbsp;
+          <button className="btn-link" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+        </span>
+      ) : (
+        <button className="btn-link danger" onClick={() => setDeleteConfirm(u.id)}>Delete</button>
+      )
+    )}
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>

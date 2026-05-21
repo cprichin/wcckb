@@ -33,9 +33,9 @@ function App() {
           <Route path="/tickets" element={<PrivateRoute><TicketList /></PrivateRoute>} />
           <Route path="/tickets/new" element={<PrivateRoute><NewTicket /></PrivateRoute>} />
           <Route path="/tickets/:id" element={<PrivateRoute><TicketDetail /></PrivateRoute>} />
-          <Route path="/kb" element={<PrivateRoute><KBList /></PrivateRoute>} />
+          <Route path="/kb" element={<PrivateRoute roles={['agent','admin']}><KBList /></PrivateRoute>} />
           <Route path="/kb/new" element={<PrivateRoute roles={['agent','admin']}><KBEditor /></PrivateRoute>} />
-          <Route path="/kb/:id" element={<PrivateRoute><KBDetail /></PrivateRoute>} />
+          <Route path="/kb/:id" element={<PrivateRoute roles={['agent','admin']}><KBDetail /></PrivateRoute>} />
           <Route path="/kb/:id/edit" element={<PrivateRoute roles={['agent','admin']}><KBEditor /></PrivateRoute>} />
           <Route path="/admin/users" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/tickets" />} />

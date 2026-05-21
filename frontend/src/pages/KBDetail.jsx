@@ -34,8 +34,15 @@ export function KBDetail() {
           </div>
         </div>
         {isAgent && (
-          <button className="btn secondary" onClick={() => navigate(`/kb/${id}/edit`)}>Edit</button>
-        )}
+  <button className="btn secondary" onClick={() => navigate(`/kb/${id}/edit`)}>Edit</button>
+)}
+{user?.role === 'admin' && (
+  <button className="btn danger" onClick={async () => {
+    if (!window.confirm('Delete this article? This cannot be undone.')) return;
+    await api.delete(`/kb/${id}`);
+    navigate('/kb');
+  }}>Delete</button>
+)}
       </div>
       <div className="card markdown-body">
         <ReactMarkdown>{article.content}</ReactMarkdown>
