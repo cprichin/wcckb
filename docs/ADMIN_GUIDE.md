@@ -14,6 +14,7 @@ This guide is written for the HelpDesk system administrator. It covers day-to-da
 - [Restoring from Backup](#restoring-from-backup)
 - [Resetting a User's Password](#resetting-a-users-password)
 - [Changing the Admin Password](#changing-the-admin-password)
+- [Deleting Tickets and Managing the Trash](#deleting-tickets-and-managing-the-trash)
 - [Managing the Knowledge Base](#managing-the-knowledge-base)
 - [Monitoring the System](#monitoring-the-system)
 - [Stopping and Starting the System](#stopping-and-starting-the-system)
@@ -45,7 +46,7 @@ From the Users page you can:
 3. Fill in the TA's name, campus email, a temporary password, and their department
 4. Set the role to **Agent**
 5. Click **Create Account**
-6. Share the temporary password with the TA and ask them to log in and note it down — there is no "change password" UI yet (see below for the manual method)
+6. Share the temporary password with the TA and ask them to change it on first login via **My Account → Change Password**. If they forget it later, they can use the **Forgot password?** link on the login page to reset it themselves.
 
 ### Promoting an Existing User to Agent
 
@@ -140,7 +141,13 @@ docker compose up -d
 
 ## Resetting a User's Password
 
-There is no self-service password reset in the MVP. To manually reset a user's password:
+In most cases users can reset their own password via the **Forgot password?** link on the login page — they enter their email, we send a reset link that expires in 60 minutes, they pick a new password. Point them there first.
+
+Manual reset is only needed when:
+
+- The user can't access their email (e.g. they no longer have the account)
+- Outbound SMTP is broken
+- You need to recover from a locked-out admin
 
 **Step 1 — Generate a bcrypt hash of the new password:**
 
@@ -156,15 +163,53 @@ Copy the output hash (starts with `$2a$10$...`).
 docker compose exec db psql -U helpdesk_user -d helpdesk -c "UPDATE users SET password_hash = 'PASTE_HASH_HERE' WHERE email = 'user@example.com';"
 ```
 
-**Step 3 —** Tell the user their temporary password and ask them to note it down.
+**Step 3 —** Tell the user their temporary password and ask them to change it via **My Account → Change Password** on first login.
 
 ---
 
 ## Changing the Admin Password
 
-Same process as above, using your own email address in the `WHERE` clause.
+The easy way: log in, go to **My Account → Change Password**.
 
-Alternatively, create a new admin account with a strong password, verify you can log in with it, then delete the old admin account.
+If you've locked yourself out and can't get in, use the manual reset procedure above with your own email in the `WHERE` clause. As a last resort, create a second admin account with a strong password, verify you can log in with it, then delete the old admin account.
+
+---
+
+## Deleting Tickets and Managing the Trash
+
+Tickets aren't hard-deleted by default. When an admin deletes a ticket (e.g. a duplicate, a test submission, or a misfiled report), it's **soft-deleted** — hidden from all lists and the dashboard, but recoverable. Permanent deletion is a separate, deliberate step.
+
+### Soft delete (move to trash)
+
+1. Open the ticket from any list
+2. Click **Move to trash** in the top right of the header
+3. Confirm
+
+The ticket disappears from the regular queue. Comments, attachments, and KB links stay with it on the row in the database — nothing is destroyed yet.
+
+### Restoring a deleted ticket
+
+1. Click **🗑 Trash** in the left sidebar (admin only)
+2. Find the ticket in the list
+3. Click **Restore** — the ticket returns to the active queue with its full history intact
+
+You can also restore from inside the ticket detail page (admins can still open soft-deleted tickets; users and agents get a 404).
+
+### Permanently deleting a ticket
+
+> ⚠️ This is irreversible. The ticket row, every comment, every attachment row, every KB link, **and the actual uploaded image files on disk** are all removed. There is no recovery without a backup.
+
+1. The ticket must already be in the trash. (This is enforced — the API refuses to purge an active ticket.)
+2. Open the **🗑 Trash** page, or open the soft-deleted ticket directly
+3. Click **Permanently delete** / **Delete forever**
+4. Confirm
+
+Use this when:
+- The ticket was clearly a test or spam submission
+- A user has asked for their data to be removed
+- Storage pressure from accumulated attachments is real
+
+If you're unsure, just leave it in the trash. Disk cost for keeping soft-deleted rows is negligible.
 
 ---
 
@@ -319,7 +364,7 @@ Common causes:
 
 ### A user is locked out
 
-Their password hash may be corrupted. Reset it manually — see [Resetting a User's Password](#resetting-a-users-password).
+First, ask them to use **Forgot password?** on the login page. If outbound email is broken or they can't access their inbox, reset their password manually — see [Resetting a User's Password](#resetting-a-users-password).
 
 ### Suspicious activity / possible breach
 

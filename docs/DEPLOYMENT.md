@@ -109,9 +109,20 @@ FRONTEND_URL=http://192.168.1.50:3000
 
 # The URL the frontend uses to reach the API
 API_URL=http://192.168.1.50:3000/api
+
+# SMTP — required for email confirmation, password reset, and ticket notifications
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-mailbox@example.com
+# For Gmail, SMTP_PASS must be an App Password (not your account password):
+# https://myaccount.google.com/apppasswords
+SMTP_PASS=your-16-character-app-password
+SMTP_NAME=HelpDesk
+SMTP_EMAIL=helpdesk@example.com
 ```
 
-> **Never commit `.env` to Git.** It is listed in `.gitignore` for this reason. If you accidentally commit it, rotate all the secrets immediately and force-push.
+> **Never commit `.env` to Git.** It is listed in `.gitignore` for this reason. If you accidentally commit it, rotate all the secrets immediately. If credentials were pushed to a public remote, treat them as compromised and rotate even after removing the commit — they live in git history and on any clone.
 
 ### Generating a secure JWT_SECRET
 
@@ -180,10 +191,16 @@ You should see the HelpDesk login page.
 
 ### Log in with the default admin account
 
-- **Email:** `admin@helpdesk.local`
-- **Password:** `admin1234`
+A default admin row is seeded by `backend/db/schema.sql` (see the
+`INSERT INTO users` block at the bottom of that file for the email
+and the bcrypt-hashed password).
 
-> Change this password immediately after first login. See `docs/ADMIN_GUIDE.md` for instructions.
+> **Change the admin password immediately after first login** via
+> **My Account → Change Password**. If you'd rather not run the seeded
+> credentials at all, edit the `INSERT INTO users` block in `schema.sql`
+> before the very first `docker compose up` — the seed runs only on
+> a fresh database volume, so once Postgres has booted there's no
+> easy way to undo it short of `docker compose down -v` (destructive).
 
 ---
 
@@ -253,19 +270,30 @@ The current setup has a brief outage (a few seconds) during rebuild while contai
 
 ## Database Migrations
 
-If a code update includes changes to the database schema (new tables, new columns), the release notes will say so and include a migration `.sql` file.
+`backend/db/schema.sql` runs **only on a fresh database volume** (via Postgres' `/docker-entrypoint-initdb.d/`). After the first start, any schema changes must be applied through numbered SQL files in `backend/db/migrations/`. Each migration is idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc.), so re-running one on an up-to-date database is safe.
 
-Apply it before rebuilding:
+To apply a migration that came with a code update:
 
 ```bash
-# Apply the migration
-docker compose exec db psql -U helpdesk_user -d helpdesk < migration_YYYY-MM-DD.sql
+# Always take a backup first — see docs/ADMIN_GUIDE.md
+docker compose exec db pg_dump -U helpdesk_user helpdesk > backup_before_migration.sql
+
+# Apply the migration (NN is the migration number, e.g. 002, 003)
+docker compose exec -T db psql -U helpdesk_user -d helpdesk < backend/db/migrations/NNN_short_name.sql
 
 # Then rebuild as normal
 docker compose up -d --build
 ```
 
-> Always take a backup before applying a migration. See `docs/ADMIN_GUIDE.md`.
+Current migrations in the repo (apply in order on an older deployment):
+
+| File | What it adds |
+|---|---|
+| `001_email_confirmation.sql` | `email_confirmed`, `confirmation_token`, `confirmation_expires_at` on `users` |
+| `002_password_reset.sql`     | `reset_token`, `reset_expires_at` on `users` |
+| `003_ticket_soft_delete.sql` | `deleted_at` on `tickets`, plus a partial index for the `deleted_at IS NULL` filter |
+
+A fresh deployment built from `schema.sql` already includes everything above and does not need the migrations.
 
 ---
 

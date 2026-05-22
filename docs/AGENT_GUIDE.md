@@ -1,8 +1,8 @@
 # Agent Guide
 
-This guide is written for HelpDesk agents — TAs and staff who work tickets, assist users, and maintain the knowledge base. If you're a regular user looking to submit a ticket, see `docs/USER_GUIDE.md` instead.
+This guide is written for HelpDesk agents — TAs and staff who work tickets, assist users, and maintain the knowledge base.
 
-> Your account was created by the system administrator. If you can't log in or don't have an account yet, contact them directly.
+> Your account was created by the system administrator. If you can't log in or don't have an account yet, contact them directly. If you've forgotten your password, use the **Forgot password?** link on the login page — it sends a reset link to your inbox.
 
 ---
 
@@ -32,20 +32,28 @@ This guide is written for HelpDesk agents — TAs and staff who work tickets, as
 
 ## Logging In
 
-Navigate to the helpdesk URL provided by your administrator and log in with the credentials they gave you.
+Navigate to the helpdesk URL provided by your administrator and log in with the credentials they gave you. On first login, change your password under **My Account → Change Password**.
 
-If this is your first time logging in, you were given a temporary password. Note it down somewhere safe — there is no self-service password reset yet. If you lose access, contact the administrator to have it reset manually.
+If you forget your password later, use the **Forgot password?** link on the login page — you'll get a one-time reset link in your email that expires after 60 minutes.
 
 ---
 
 ## Your Dashboard
 
-After logging in you'll land on the **Tickets** page. As an agent you see all tickets from all users — not just your own. The sidebar gives you access to:
+After logging in you'll land on the **Dashboard** at `/dashboard`. It summarises:
 
+- **Your active workload** — open / in-progress / pending tickets assigned to you
+- **Your resolved-this-period count** — how many you closed in the selected window (7d / 30d / all-time, toggle at the top)
+- **Team-wide totals** — open queue and unassigned-awaiting-pickup
+- **Charts** — tickets by status, active tickets by priority, top active categories
+
+Use the **Tickets** page for the actual queue. The sidebar gives you access to:
+
+- **Dashboard** — what you see when you log in
 - **Tickets** — the full ticket queue
 - **Knowledge Base** — all articles, including drafts not visible to regular users
 
-Use the status filter buttons at the top of the ticket list to focus on what needs attention:
+On the ticket list, use the status filter buttons at the top to focus on what needs attention:
 
 | Filter | What to look at |
 |---|---|
@@ -128,7 +136,7 @@ Use the **Priority** dropdown in the right sidebar. When in doubt, leave it at `
 
 ### Commenting on Tickets
 
-Use the comment box at the bottom of the ticket to communicate with the user. They can see all regular comments and will need to check the ticket page for updates (email notifications are planned for a future release).
+Use the comment box at the bottom of the ticket to communicate with the user. They see all regular (non-internal) comments and receive an email notification each time one is posted on a ticket they submitted. Likewise, when a user replies, you get an email if the ticket is assigned to you.
 
 Good commenting habits:
 - **Acknowledge quickly** — even "I'm looking into this" is better than silence

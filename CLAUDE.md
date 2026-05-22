@@ -52,6 +52,9 @@ Three roles: `user`, `agent`, `admin`. New self-registrations are always `user`;
 ### Email confirmation + purge
 Registration creates an unconfirmed account with a 6-hour confirmation token (`confirmation_expires_at`). `services/purge.js` runs every 30 minutes (started from `server.js`) and `DELETE`s any unconfirmed accounts whose token has expired. Logins for unconfirmed accounts return 403 with `{ unconfirmed: true }`. If `sendConfirmationEmail` throws during registration, the freshly inserted user row is deleted so the email isn't taken.
 
+### Forgot-password flow
+`reset_token` + `reset_expires_at` columns on `users` hold a 1-hour single-use token issued by `POST /api/auth/forgot`. That endpoint **always** returns the same generic 200 regardless of whether the email exists — this is intentional, to avoid account enumeration; do not change it to a 404 or a different message. `POST /api/auth/reset/:token` validates expiry, hashes the new password (8-char minimum), and clears the token. If the account was still `email_confirmed = FALSE`, the reset also flips it to `TRUE` — clicking the link proves inbox ownership, so we don't need a separate confirmation step. `404` means invalid/used token, `410` means expired (so the UI can phrase the error appropriately).
+
 ### Ticket auto-assignment
 On `POST /api/tickets`, `services/assignments.js#autoAssign()` picks the **confirmed agent** with the fewest currently active (not resolved/closed) tickets. Admins are **not** considered for auto-assignment (only `role = 'agent'`). If no eligible agent exists, the ticket is created unassigned.
 
@@ -70,6 +73,19 @@ When adding a new event that should email, follow this pattern: do the DB write,
 - Users never see `is_internal = TRUE` comments — this is enforced by appending an `AND c.is_internal = FALSE` clause to the comments query when `req.user.role === 'user'`, not by post-filtering in JS.
 - `PATCH` uses `COALESCE($n, column)` so any subset of fields can be sent. `resolved_at` is set via `CASE WHEN $5 THEN NOW() ELSE resolved_at END` when status flips to `resolved`.
 - File uploads: multer disk storage in `backend/uploads` (persisted via the `uploads_data` Docker volume), 5 MB cap, image MIME types only.
+
+### Soft delete + admin trash
+Tickets carry a nullable `deleted_at` timestamp. Setting it = soft delete (admin-only via `DELETE /api/tickets/:id`); clearing it = restore (`POST /api/tickets/:id/restore`). Permanent hard delete (`DELETE /api/tickets/:id/purge`) is admin-only **and** guarded — the row must already be soft-deleted, so a misclick can't nuke an active ticket. Hard delete relies on FK `ON DELETE CASCADE` to clean up comments/attachments rows, then best-effort `fs.unlinkSync`s attachment files from `backend/uploads/` (ENOENT is swallowed, other unlink errors are logged but non-fatal).
+
+Everywhere else in the codebase, soft-deleted tickets must be **invisible**. Every list/aggregate/auto-assignment query has an `AND deleted_at IS NULL` filter:
+- `GET /api/tickets`, `GET /api/tickets/:id` (admins are exempted on detail so they can preview before restoring; users and agents get a 404).
+- All dashboard CTEs and counts in `routes/dashboard.js`.
+- The workload count in `services/assignments.js#autoAssign`.
+
+When adding any new ticket query, copy this filter. The partial index `idx_tickets_not_deleted ON tickets (id) WHERE deleted_at IS NULL` (added in migration 003) keeps the filter cheap as the trash grows.
+
+### Dashboard
+`backend/routes/dashboard.js` exposes a single `GET /api/dashboard?period=7d|30d|all` for agents/admins. The `period` query param maps through a hardcoded allowlist (`PERIODS`) to a PostgreSQL interval literal — only those three values can ever reach the SQL string interpolation, so the filter clauses are safe to splice into the templates even though they're not parameterized. Admins receive an additional `agent_stats` block built from four CTEs joined onto the confirmed-agent roster so agents with zero activity still appear. The frontend (`pages/Dashboard.jsx`) uses Recharts; agents/admins are routed here by default after login, regular users still land on `/tickets`.
 
 ### Frontend
 Single React app, React Router v6. `AuthContext` holds the user and exposes login/logout; `Layout` wraps every authenticated route with the sidebar. Pages are named after the route they serve (e.g. `TicketDetail.jsx` ↔ `/tickets/:id`). Nginx (`frontend/nginx.conf`) serves the built bundle and proxies `/api` to the backend container.

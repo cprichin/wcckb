@@ -63,10 +63,10 @@ This will:
 
 Open `http://your-server-ip:3000` in a browser.
 
-**Default admin account:**
-- Email: `admin@helpdesk.local`
-- Password: `admin1234`  
-  ⚠️ **Change this immediately** in the Users admin panel after first login.
+**Default admin account:** seeded by `backend/db/schema.sql` on first start
+(see the `INSERT INTO users` block at the bottom of that file for the email
+and the bcrypt-hashed default password — log in once and change it immediately
+via **My Account → Change Password**, or by editing the seed before first boot).
 
 ---
 
@@ -87,20 +87,28 @@ New registrations default to the `user` role. Promote users to `agent` or `admin
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Login, returns JWT |
-| GET  | `/api/auth/me` | Get current user |
+| POST  | `/api/auth/register`        | Create account (sends email confirmation link) |
+| GET   | `/api/auth/confirm/:token`  | Confirm a newly-registered email address |
+| POST  | `/api/auth/login`           | Login, returns JWT |
+| GET   | `/api/auth/me`              | Get current user |
+| POST  | `/api/auth/forgot`          | Request a password-reset link (enumeration-safe) |
+| POST  | `/api/auth/reset/:token`    | Set a new password using a reset token |
+| PATCH | `/api/auth/password`        | Change own password (requires current password) |
 
 ### Tickets
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| GET    | `/api/tickets` | List tickets (own for users, all for agents) | all |
-| GET    | `/api/tickets/:id` | Get ticket detail with comments & attachments | all |
-| POST   | `/api/tickets` | Create ticket | all |
-| PATCH  | `/api/tickets/:id` | Update status, priority, assignee | agent, admin |
-| POST   | `/api/tickets/:id/comments` | Add comment (or internal note) | all |
-| POST   | `/api/tickets/:id/attachments` | Upload image | all |
-| POST   | `/api/tickets/:id/kb-links` | Link KB article to ticket | agent, admin |
+| GET    | `/api/tickets`                  | List tickets (own for users, all for agents) | all |
+| GET    | `/api/tickets/trash`            | List soft-deleted tickets | admin |
+| GET    | `/api/tickets/:id`              | Get ticket detail with comments & attachments | all |
+| POST   | `/api/tickets`                  | Create ticket (auto-assigns to least-loaded agent) | all |
+| PATCH  | `/api/tickets/:id`              | Update status, priority, assignee | agent, admin |
+| DELETE | `/api/tickets/:id`              | Soft delete (move to trash) | admin |
+| POST   | `/api/tickets/:id/restore`      | Restore a soft-deleted ticket | admin |
+| DELETE | `/api/tickets/:id/purge`        | Permanently delete (must be in trash first) | admin |
+| POST   | `/api/tickets/:id/comments`     | Add comment (or internal note) | all |
+| POST   | `/api/tickets/:id/attachments`  | Upload image | all |
+| POST   | `/api/tickets/:id/kb-links`     | Link KB article to ticket | agent, admin |
 
 ### Knowledge Base
 | Method | Endpoint | Description | Roles |
@@ -110,6 +118,11 @@ New registrations default to the `user` role. Promote users to `agent` or `admin
 | POST   | `/api/kb` | Create article | agent, admin |
 | PATCH  | `/api/kb/:id` | Update article | agent, admin |
 | DELETE | `/api/kb/:id` | Delete article | admin |
+
+### Dashboard
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| GET    | `/api/dashboard?period=7d\|30d\|all` | Personal + team metrics; admins also receive a per-agent productivity table | agent, admin |
 
 ### Users (admin only)
 | Method | Endpoint | Description |
@@ -163,10 +176,19 @@ docker compose exec -T db psql -U helpdesk_user helpdesk < backup.sql
 
 ---
 
-## Phase 2 Ideas (Next Steps)
+## Roadmap
 
-- **Email notifications** — use Nodemailer to alert users when tickets are updated
-- **Full-text search** — add PostgreSQL `tsvector` indexes for fast KB + ticket search  
-- **AI KB suggestions** — when creating a ticket, call Claude API to suggest relevant KB articles
-- **Dashboard** — charts for open tickets by status, resolution time, top KB articles
-- **SLA tracking** — flag tickets that have been open too long
+Shipped:
+- Email confirmation on registration + email notifications on ticket events
+- Self-service password reset (forgot-password flow)
+- Auto-assignment of new tickets to the least-loaded agent
+- Dashboard with team/personal metrics and per-agent productivity (admin view)
+- Soft delete + admin trash with restore / permanent delete
+
+Still on the roadmap:
+- **Full-text search** — PostgreSQL `tsvector` indexes for fast KB + ticket search
+- **AI KB suggestions** — when creating a ticket, call Claude API to suggest relevant KB articles inline
+- **SLA tracking** — flag tickets that have been open too long given their priority
+- **Email-to-ticket** — create tickets from inbound email (no login required)
+- **Filter & search on the ticket list** — chips for priority/assignee/category + text search
+- **Auth-endpoint rate limiting** — slow down brute-force attempts on login/register/forgot

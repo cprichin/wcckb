@@ -45,11 +45,9 @@ docker compose up -d --build
 # App is now running at http://localhost:3000
 ```
 
-Default local admin login:
-- **Email:** `admin@helpdesk.local`
-- **Password:** `admin1234`
+A default admin account is seeded by `backend/db/schema.sql` on the first start of a fresh database. Look at the `INSERT INTO users` block at the bottom of that file for the email and the bcrypt-hashed default password.
 
-> ⚠️ Never use default credentials on the production server.
+> ⚠️ Never use the seeded default credentials on a production server — change the admin password via **My Account → Change Password** immediately after the first login (or edit the seed in `schema.sql` before the very first `docker compose up`).
 
 ---
 
