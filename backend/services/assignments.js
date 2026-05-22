@@ -14,6 +14,7 @@ async function autoAssign() {
     LEFT JOIN tickets t
       ON t.assigned_to = u.id
       AND t.status NOT IN ('resolved', 'closed')
+      AND t.deleted_at IS NULL
     WHERE u.role IN ('agent')
       AND u.email_confirmed = TRUE
     GROUP BY u.id

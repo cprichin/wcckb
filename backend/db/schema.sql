@@ -30,8 +30,13 @@ CREATE TABLE IF NOT EXISTS tickets (
   assigned_to INT REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW(),
-  resolved_at TIMESTAMPTZ
+  resolved_at TIMESTAMPTZ,
+  deleted_at  TIMESTAMPTZ
 );
+
+CREATE INDEX IF NOT EXISTS idx_tickets_not_deleted
+  ON tickets (id)
+  WHERE deleted_at IS NULL;
 
 -- TICKET ATTACHMENTS (images)
 CREATE TABLE IF NOT EXISTS ticket_attachments (

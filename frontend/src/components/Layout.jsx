@@ -37,6 +37,11 @@ export default function Layout({ children }) {
               👥 Users
             </NavLink>
           )}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin/trash" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              🗑 Trash
+            </NavLink>
+          )}
           <NavLink to="/account" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             👤 My Account
           </NavLink>

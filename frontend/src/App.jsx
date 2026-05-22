@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import { KBList } from './pages/KB';
 import { KBDetail, KBEditor } from './pages/KBDetail';
 import AdminUsers from './pages/AdminUsers';
+import AdminTrash from './pages/AdminTrash';
 import MyAccount from './pages/MyAccount';
 import './App.css';
 
@@ -56,6 +57,7 @@ function App() {
           <Route path="/kb/:id" element={<PrivateRoute roles={['agent','admin']}><KBDetail /></PrivateRoute>} />
           <Route path="/kb/:id/edit" element={<PrivateRoute roles={['agent','admin']}><KBEditor /></PrivateRoute>} />
           <Route path="/admin/users" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
+          <Route path="/admin/trash" element={<PrivateRoute roles={['admin']}><AdminTrash /></PrivateRoute>} />
           <Route path="*" element={<DefaultRedirect />} />
         </Routes>
       </BrowserRouter>

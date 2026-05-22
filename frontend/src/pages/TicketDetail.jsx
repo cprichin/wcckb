@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,6 +7,7 @@ const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || '';
 
 export default function TicketDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [ticket, setTicket] = useState(null);
   const [comment, setComment] = useState('');
@@ -17,6 +18,7 @@ export default function TicketDetail() {
   const [linkArticleId, setLinkArticleId] = useState('');
   const [loading, setLoading] = useState(true);
   const isAgent = ['agent', 'admin'].includes(user?.role);
+  const isAdmin = user?.role === 'admin';
 
   const load = () => {
     api.get(`/tickets/${id}`).then(res => setTicket(res.data)).finally(() => setLoading(false));
@@ -62,11 +64,46 @@ export default function TicketDetail() {
     load();
   };
 
+  const softDelete = async () => {
+    if (!window.confirm(`Move ticket #${ticket.id} to the trash? It can be restored from the Trash page.`)) return;
+    await api.delete(`/tickets/${id}`);
+    navigate('/tickets');
+  };
+
+  const restore = async () => {
+    await api.post(`/tickets/${id}/restore`);
+    load();
+  };
+
+  const purge = async () => {
+    if (!window.confirm(`Permanently delete ticket #${ticket.id}? This removes the ticket, all its comments, attachments (including uploaded files), and KB links. This cannot be undone.`)) return;
+    await api.delete(`/tickets/${id}/purge`);
+    navigate('/admin/trash');
+  };
+
   if (loading) return <div className="page"><p>Loading…</p></div>;
   if (!ticket) return <div className="page"><p>Ticket not found.</p></div>;
 
   return (
     <div className="page">
+      {ticket.deleted_at && (
+        <div className="alert trash-banner">
+          <div>
+            <strong>This ticket is in the trash.</strong>
+            <div style={{ fontSize: 13, marginTop: 4 }}>
+              Deleted {new Date(ticket.deleted_at).toLocaleString()}.
+              Restore it to bring it back to the active queue, or permanently delete to remove it forever.
+            </div>
+          </div>
+          {isAdmin && (
+            <div className="trash-banner-actions">
+              <button className="btn secondary" onClick={restore}>Restore</button>
+              <button className="btn danger" onClick={purge}>Permanently delete</button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="ticket-detail-header">
         <div>
           <span className="ticket-id">#{ticket.id}</span>
@@ -77,6 +114,9 @@ export default function TicketDetail() {
             {ticket.category && <span className="tag">{ticket.category}</span>}
           </div>
         </div>
+        {isAdmin && !ticket.deleted_at && (
+          <button className="btn danger" onClick={softDelete}>Move to trash</button>
+        )}
       </div>
 
       <div className="detail-grid">

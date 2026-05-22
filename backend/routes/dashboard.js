@@ -40,6 +40,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
           )::int AS my_resolved
         FROM tickets
         WHERE assigned_to = $1
+          AND deleted_at IS NULL
       `, [req.user.id]),
 
       // Team-wide counts
@@ -60,12 +61,14 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
               AND status NOT IN ('resolved', 'closed')
           )::int AS team_unassigned
         FROM tickets
+        WHERE deleted_at IS NULL
       `),
 
       // Status breakdown across all tickets
       db.query(`
         SELECT status, COUNT(*)::int AS count
         FROM tickets
+        WHERE deleted_at IS NULL
         GROUP BY status
         ORDER BY status
       `),
@@ -75,6 +78,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
         SELECT priority, COUNT(*)::int AS count
         FROM tickets
         WHERE status NOT IN ('resolved', 'closed')
+          AND deleted_at IS NULL
         GROUP BY priority
       `),
 
@@ -83,6 +87,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
         SELECT COALESCE(category, 'Uncategorized') AS category, COUNT(*)::int AS count
         FROM tickets
         WHERE status NOT IN ('resolved', 'closed')
+          AND deleted_at IS NULL
         GROUP BY COALESCE(category, 'Uncategorized')
         ORDER BY count DESC
         LIMIT 10
@@ -109,6 +114,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
           FROM tickets
           WHERE status IN ('open', 'in_progress', 'pending')
             AND assigned_to IS NOT NULL
+            AND deleted_at IS NULL
           GROUP BY assigned_to
         ),
         resolved_in_period AS (
@@ -119,6 +125,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
           FROM tickets
           WHERE resolved_at IS NOT NULL
             AND assigned_to IS NOT NULL
+            AND deleted_at IS NULL
             ${intervalSql ? `AND resolved_at >= NOW() - ${intervalSql}` : ''}
           GROUP BY assigned_to
         ),
@@ -134,6 +141,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
               AND c.user_id = t.assigned_to
           ) fr ON fr.first_at IS NOT NULL
           WHERE t.assigned_to IS NOT NULL
+            AND t.deleted_at IS NULL
             ${ticketCreatedFilter}
           GROUP BY t.assigned_to
         ),
@@ -152,6 +160,7 @@ router.get('/', authenticate, authorize('agent', 'admin'), async (req, res) => {
           FROM tickets t
           JOIN comment_gaps g ON g.ticket_id = t.id
           WHERE t.assigned_to IS NOT NULL
+            AND t.deleted_at IS NULL
             AND g.gap_hours IS NOT NULL
             ${ticketCreatedFilter}
           GROUP BY t.assigned_to

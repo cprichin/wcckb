@@ -34,7 +34,8 @@ const upload = multer({
   },
 });
 
-// GET /api/tickets — list tickets (user sees own, agent/admin sees all)
+// GET /api/tickets — list tickets (user sees own, agent/admin sees all).
+// Soft-deleted tickets are always excluded — see GET /trash for the admin recycle bin.
 router.get('/', authenticate, async (req, res) => {
   try {
     const isAgent = ['agent', 'admin'].includes(req.user.role);
@@ -43,12 +44,14 @@ router.get('/', authenticate, async (req, res) => {
          FROM tickets t
          LEFT JOIN users u ON t.created_by = u.id
          LEFT JOIN users a ON t.assigned_to = a.id
+         WHERE t.deleted_at IS NULL
          ORDER BY t.created_at DESC`
       : `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
          FROM tickets t
          LEFT JOIN users u ON t.created_by = u.id
          LEFT JOIN users a ON t.assigned_to = a.id
          WHERE t.created_by = $1
+           AND t.deleted_at IS NULL
          ORDER BY t.created_at DESC`;
 
     const result = isAgent
@@ -62,7 +65,28 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/tickets/:id — get single ticket with comments, attachments, KB links
+// GET /api/tickets/trash — admin-only listing of soft-deleted tickets.
+// Defined before /:id so the literal path wins over the param route.
+router.get('/trash', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
+       FROM tickets t
+       LEFT JOIN users u ON t.created_by = u.id
+       LEFT JOIN users a ON t.assigned_to = a.id
+       WHERE t.deleted_at IS NOT NULL
+       ORDER BY t.deleted_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/tickets/:id — get single ticket with comments, attachments, KB links.
+// Soft-deleted tickets are visible to admins only (for preview before restore/purge);
+// users and agents get a 404.
 router.get('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   try {
@@ -77,6 +101,8 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!ticket.rows.length) return res.status(404).json({ error: 'Ticket not found' });
 
     const t = ticket.rows[0];
+    if (t.deleted_at && req.user.role !== 'admin')
+      return res.status(404).json({ error: 'Ticket not found' });
     // Check ownership for regular users
     if (req.user.role === 'user' && t.created_by !== req.user.id)
       return res.status(403).json({ error: 'Forbidden' });
@@ -298,6 +324,83 @@ router.post('/:id/kb-links', authenticate, authorize('agent', 'admin'), async (r
       [req.params.id, article_id, req.user.id]
     );
     res.status(201).json({ message: 'Linked' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/tickets/:id — soft delete (admin only).
+// The ticket disappears from all list/detail views but is recoverable from /trash.
+router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE tickets SET deleted_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id`,
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Ticket not found or already deleted' });
+    res.json({ message: 'Ticket moved to trash', id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/tickets/:id/restore — restore a soft-deleted ticket (admin only).
+router.post('/:id/restore', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE tickets SET deleted_at = NULL
+       WHERE id = $1 AND deleted_at IS NOT NULL
+       RETURNING id`,
+      [req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Ticket not found in trash' });
+    res.json({ message: 'Ticket restored', id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/tickets/:id/purge — permanently delete a soft-deleted ticket (admin only).
+// Cascades to comments, attachments rows, and KB links via FK ON DELETE CASCADE.
+// Best-effort unlinks attachment files from disk; orphaned files are logged but not fatal.
+router.delete('/:id/purge', authenticate, authorize('admin'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Only purge if already soft-deleted, so a misclick can't nuke an active ticket.
+    const guard = await db.query(
+      `SELECT id FROM tickets WHERE id = $1 AND deleted_at IS NOT NULL`,
+      [id]
+    );
+    if (!guard.rows.length) {
+      return res.status(404).json({ error: 'Ticket must be in trash before it can be purged' });
+    }
+
+    // Collect attachment filenames before the cascade removes the rows.
+    const attachments = await db.query(
+      `SELECT filename FROM ticket_attachments WHERE ticket_id = $1`,
+      [id]
+    );
+
+    await db.query(`DELETE FROM tickets WHERE id = $1`, [id]);
+
+    const uploadDir = path.join(__dirname, '../uploads');
+    for (const row of attachments.rows) {
+      const filePath = path.join(uploadDir, row.filename);
+      try {
+        fs.unlinkSync(filePath);
+      } catch (fileErr) {
+        if (fileErr.code !== 'ENOENT') {
+          console.error(`[purge] could not unlink ${filePath}:`, fileErr.message);
+        }
+      }
+    }
+
+    res.json({ message: 'Ticket permanently deleted', id: Number(id) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
