@@ -1,4 +1,4 @@
-# HelpDesk MVP
+# HelpDesk
 
 A self-hosted ticketing system with integrated knowledge base.
 Built with Node.js + Express, React, and PostgreSQL — runs entirely in Docker.
