@@ -35,29 +35,59 @@ const upload = multer({
 });
 
 // GET /api/tickets — list tickets (user sees own, agent/admin sees all).
+// Optional ?q= does full-text search across title, description, and category.
 // Soft-deleted tickets are always excluded — see GET /trash for the admin recycle bin.
 router.get('/', authenticate, async (req, res) => {
+  const q = req.query.q?.trim() || '';
+  const isAgent = ['agent', 'admin'].includes(req.user.role);
   try {
-    const isAgent = ['agent', 'admin'].includes(req.user.role);
-    const query = isAgent
-      ? `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
-         FROM tickets t
-         LEFT JOIN users u ON t.created_by = u.id
-         LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.deleted_at IS NULL
-         ORDER BY t.created_at DESC`
-      : `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
-         FROM tickets t
-         LEFT JOIN users u ON t.created_by = u.id
-         LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.created_by = $1
-           AND t.deleted_at IS NULL
-         ORDER BY t.created_at DESC`;
-
-    const result = isAgent
-      ? await db.query(query)
-      : await db.query(query, [req.user.id]);
-
+    let result;
+    if (q) {
+      if (isAgent) {
+        result = await db.query(
+          `SELECT t.*, u.name AS creator_name, a.name AS assignee_name,
+                  ts_rank(t.search_vector, websearch_to_tsquery('english', $1)) AS rank
+           FROM tickets t
+           LEFT JOIN users u ON t.created_by = u.id
+           LEFT JOIN users a ON t.assigned_to = a.id
+           WHERE t.deleted_at IS NULL
+             AND t.search_vector @@ websearch_to_tsquery('english', $1)
+           ORDER BY rank DESC`,
+          [q]
+        );
+      } else {
+        result = await db.query(
+          `SELECT t.*, u.name AS creator_name, a.name AS assignee_name,
+                  ts_rank(t.search_vector, websearch_to_tsquery('english', $2)) AS rank
+           FROM tickets t
+           LEFT JOIN users u ON t.created_by = u.id
+           LEFT JOIN users a ON t.assigned_to = a.id
+           WHERE t.created_by = $1
+             AND t.deleted_at IS NULL
+             AND t.search_vector @@ websearch_to_tsquery('english', $2)
+           ORDER BY rank DESC`,
+          [req.user.id, q]
+        );
+      }
+    } else {
+      result = await db.query(
+        isAgent
+          ? `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
+             FROM tickets t
+             LEFT JOIN users u ON t.created_by = u.id
+             LEFT JOIN users a ON t.assigned_to = a.id
+             WHERE t.deleted_at IS NULL
+             ORDER BY t.created_at DESC`
+          : `SELECT t.*, u.name AS creator_name, a.name AS assignee_name
+             FROM tickets t
+             LEFT JOIN users u ON t.created_by = u.id
+             LEFT JOIN users a ON t.assigned_to = a.id
+             WHERE t.created_by = $1
+               AND t.deleted_at IS NULL
+             ORDER BY t.created_at DESC`,
+        isAgent ? [] : [req.user.id]
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     console.error(err);

@@ -23,12 +23,29 @@ export default function TicketList() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Debounce: update the real query 300ms after the user stops typing
   useEffect(() => {
-    api.get('/tickets').then(res => setTickets(res.data)).finally(() => setLoading(false));
-  }, []);
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  const filtered = filter === 'all' ? tickets.filter(t => t.status !== 'closed') : tickets.filter(t => t.status === filter);
+  // Re-fetch whenever the debounced query changes
+  useEffect(() => {
+    setLoading(true);
+    const params = searchQuery ? { q: searchQuery } : {};
+    api.get('/tickets', { params })
+      .then(res => setTickets(res.data))
+      .finally(() => setLoading(false));
+  }, [searchQuery]);
+
+  const filtered = searchQuery
+    ? tickets  // already ranked by relevance from the server; keep order
+    : filter === 'all'
+      ? tickets.filter(t => t.status !== 'closed')
+      : tickets.filter(t => t.status === filter);
 
   return (
     <div className="page">
@@ -37,17 +54,31 @@ export default function TicketList() {
         <Link to="/tickets/new" className="btn primary">+ New Ticket</Link>
       </div>
 
-      <div className="filter-bar">
-        {['all', 'open', 'in_progress', 'pending', 'resolved', 'closed'].map(s => (
-          <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`}
-            onClick={() => setFilter(s)}>
-            {s.replace('_', ' ')}
-          </button>
-        ))}
+      <div className="search-bar">
+        <input
+          type="search"
+          placeholder="Search tickets..."
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          className="search-input"
+        />
       </div>
 
-      {loading ? <p>Loading…</p> : filtered.length === 0 ? (
-        <div className="empty-state">No tickets found.</div>
+      {!searchQuery && (
+        <div className="filter-bar">
+          {['all', 'open', 'in_progress', 'pending', 'resolved', 'closed'].map(s => (
+            <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`}
+              onClick={() => setFilter(s)}>
+              {s.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? <p>Loading...</p> : filtered.length === 0 ? (
+        <div className="empty-state">
+          {searchQuery ? `No tickets found for "${searchQuery}".` : 'No tickets found.'}
+        </div>
       ) : (
         <div className="ticket-list">
           {filtered.map(ticket => (

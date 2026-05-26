@@ -20,23 +20,40 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- TICKETS
 CREATE TABLE IF NOT EXISTS tickets (
-  id          SERIAL PRIMARY KEY,
-  title       VARCHAR(255) NOT NULL,
-  description TEXT NOT NULL,
-  status      VARCHAR(30) NOT NULL DEFAULT 'open', -- open, in_progress, pending, resolved, closed
-  priority    VARCHAR(20) NOT NULL DEFAULT 'medium', -- low, medium, high, urgent
-  category    VARCHAR(100),
-  created_by  INT REFERENCES users(id) ON DELETE SET NULL,
-  assigned_to INT REFERENCES users(id) ON DELETE SET NULL,
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ DEFAULT NOW(),
-  resolved_at TIMESTAMPTZ,
-  deleted_at  TIMESTAMPTZ
+  id            SERIAL PRIMARY KEY,
+  title         VARCHAR(255) NOT NULL,
+  description   TEXT NOT NULL,
+  status        VARCHAR(30) NOT NULL DEFAULT 'open', -- open, in_progress, pending, resolved, closed
+  priority      VARCHAR(20) NOT NULL DEFAULT 'medium', -- low, medium, high, urgent
+  category      VARCHAR(100),
+  created_by    INT REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to   INT REFERENCES users(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at   TIMESTAMPTZ,
+  deleted_at    TIMESTAMPTZ,
+  search_vector tsvector
 );
 
 CREATE INDEX IF NOT EXISTS idx_tickets_not_deleted
   ON tickets (id)
   WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_tickets_search ON tickets USING GIN (search_vector);
+
+CREATE OR REPLACE FUNCTION tickets_search_vector_update() RETURNS trigger AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.title, '')),       'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(NEW.category, '')),    'C');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tickets_search_vector_trigger
+  BEFORE INSERT OR UPDATE OF title, description, category ON tickets
+  FOR EACH ROW EXECUTE FUNCTION tickets_search_vector_update();
 
 -- TICKET ATTACHMENTS (images)
 CREATE TABLE IF NOT EXISTS ticket_attachments (

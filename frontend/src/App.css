@@ -93,6 +93,7 @@ input:focus, textarea:focus, select:focus { border-color: #3b82f6; background: #
   font-size: 11px; }
 
 /* ── Filter Bar ── */
+.search-bar { margin-bottom: 12px; }
 .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #d1d5db;
   background: #fff; font-size: 13px; color: #64748b; transition: .15s; text-transform: capitalize; }
