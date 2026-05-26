@@ -27,7 +27,7 @@ docker compose logs -f db
 
 # DB backup / restore
 docker compose exec db pg_dump -U helpdesk_user helpdesk > backup.sql
-docker compose exec -T db psql -U helpdesk_user helpdesk < backup.sql
+Get-Content backup.sql | docker compose exec -T db psql -U helpdesk_user helpdesk
 
 # Generate a bcrypt hash (e.g. for seeding an admin)
 docker compose exec backend node -e "const b=require('bcryptjs'); b.hash('yourpassword',10).then(console.log)"
@@ -39,7 +39,7 @@ docker compose down -v
 `schema.sql` only runs on **initial** database creation (it's mounted into `/docker-entrypoint-initdb.d/`). Subsequent schema changes must go through `backend/db/migrations/*.sql`, applied manually:
 
 ```powershell
-docker compose exec -T db psql -U helpdesk_user -d helpdesk < backend/db/migrations/NNN_name.sql
+Get-Content backend/db/migrations/NNN_name.sql | docker compose exec -T db psql -U helpdesk_user -d helpdesk
 ```
 
 ## Architecture
@@ -59,13 +59,17 @@ Registration creates an unconfirmed account with a 6-hour confirmation token (`c
 On `POST /api/tickets`, `services/assignments.js#autoAssign()` picks the **confirmed agent** with the fewest currently active (not resolved/closed) tickets. Admins are **not** considered for auto-assignment (only `role = 'agent'`). If no eligible agent exists, the ticket is created unassigned.
 
 ### Notifications
-All email sends go through `services/notifications.js` and are **fire-and-forget** (`.catch(console.error)` on every call site) — a failing SMTP call must never break the API response. The five hooks:
-- `notifyTicketCreated` — broadcast to all confirmed agents/admins on create.
+All email sends go through `services/notifications.js` and are **fire-and-forget** (`.catch(console.error)` on every call site) — a failing SMTP call must never break the API response. The six hooks:
+- `notifyTicketSubmitted` — confirm receipt to the ticket creator on create.
+- `notifyTicketCreated` — broadcast to all confirmed **admins** on create (agents are excluded; only the assigned agent gets the separate assignment email).
 - `notifyTicketAssigned` — DM the new assignee on auto-assign or manual reassign.
 - `notifyStatusChanged` / `notifyTicketClosed` — DM the creator (and assignee on close). Status change to `closed` uses the dedicated closed function instead.
 - `notifyCommentAdded` — internal comments (`is_internal = TRUE`) are **never** emailed; otherwise creator-replies notify the assignee, agent-replies notify the creator.
 
 When adding a new event that should email, follow this pattern: do the DB write, then call the notify function with `.catch(console.error)` — never `await` it before the response.
+
+### Route ordering
+Express matches routes in declaration order. Any literal sub-path (e.g. `/trash`, `/all`) **must be defined before** the `/:id` param route, or Express will treat the literal as a param value. See `tickets.js` (`/trash` before `/:id`) and `announcements.js` (`/all` before `/:id`) as examples.
 
 ### Tickets route conventions
 `backend/routes/tickets.js` is the canonical reference for how routes are structured here:
@@ -83,6 +87,9 @@ Everywhere else in the codebase, soft-deleted tickets must be **invisible**. Eve
 - The workload count in `services/assignments.js#autoAssign`.
 
 When adding any new ticket query, copy this filter. The partial index `idx_tickets_not_deleted ON tickets (id) WHERE deleted_at IS NULL` (added in migration 003) keeps the filter cheap as the trash grows.
+
+### Announcements
+`backend/routes/announcements.js` — site-wide banners stored in the `announcements` table (migration 005). `GET /api/announcements` returns active, non-expired rows for all users; `GET /api/announcements/all` is admin-only. The `AnnouncementBanner` component in `Layout.jsx` fetches on mount and stores per-session dismissals in `sessionStorage` under key `hd_dismissed_announcements`.
 
 ### Dashboard
 `backend/routes/dashboard.js` exposes a single `GET /api/dashboard?period=7d|30d|all` for agents/admins. The `period` query param maps through a hardcoded allowlist (`PERIODS`) to a PostgreSQL interval literal — only those three values can ever reach the SQL string interpolation, so the filter clauses are safe to splice into the templates even though they're not parameterized. Admins receive an additional `agent_stats` block built from four CTEs joined onto the confirmed-agent roster so agents with zero activity still appear. The frontend (`pages/Dashboard.jsx`) uses Recharts; agents/admins are routed here by default after login, regular users still land on `/tickets`.
@@ -103,7 +110,7 @@ Single React app, React Router v6. `AuthContext` holds the user and exposes logi
 ## Things to be careful with
 
 - `docker compose down -v` deletes the postgres volume. Safe for local dev resets, **catastrophic on the production server**.
-- `docker-compose.yml` currently has SMTP credentials inlined under the `backend` service (not pulled from `.env`). If you touch that file, don't leak them in commits — and consider moving them to env vars.
+- SMTP credentials live in `.env` (read into `docker-compose.yml` via `${SMTP_*}` expansion). Don't commit `.env` to git.
 - The seed admin in `schema.sql` only inserts on a fresh DB (`ON CONFLICT DO NOTHING`). Changing the seed won't affect an existing deployment.
 - JWTs expire in 12h (`backend/routes/auth.js`). The frontend has no refresh flow — a 401 just kicks the user to `/login`.
 
