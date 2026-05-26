@@ -1,4 +1,4 @@
-const { transporter } = require('./email');
+const { sendMail } = require('./email');
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ async function notifyTicketCreated(ticket, creatorName, recipients) {
 
   await Promise.allSettled(
     recipients.map(recipient =>
-      transporter.sendMail({
+      sendMail({
         from: FROM,
         to: `"${recipient.name}" <${recipient.email}>`,
         subject: `[HelpDesk] New ticket #${ticket.id}: ${ticket.title}`,
@@ -147,7 +147,7 @@ async function notifyTicketAssigned(ticket, assignee, creatorName) {
     `Submitted by: ${creatorName}\n\n` +
     `View: ${ticketUrl}`;
 
-  await transporter.sendMail({
+  await sendMail({
     from: FROM,
     to: `"${assignee.name}" <${assignee.email}>`,
     subject: `[HelpDesk] Ticket #${ticket.id} assigned to you`,
@@ -194,7 +194,7 @@ async function notifyStatusChanged(ticket, creator, oldStatus) {
     `Your ticket #${ticket.id} status changed from "${oldStatus}" to "${ticket.status}".\n\n` +
     `View: ${ticketUrl}`;
 
-  await transporter.sendMail({
+  await sendMail({
     from: FROM,
     to: `"${creator.name}" <${creator.email}>`,
     subject: `[HelpDesk] Ticket #${ticket.id} status updated: ${statusLabel}`,
@@ -244,7 +244,7 @@ async function notifyTicketClosed(ticket, creator, assignee) {
         `If your issue is unresolved, please open a new ticket referencing #${ticket.id}.\n\n` +
         `View: ${ticketUrl}`;
 
-      return transporter.sendMail({
+      return sendMail({
         from: FROM,
         to: `"${recipient.name}" <${recipient.email}>`,
         subject: `[HelpDesk] Ticket #${ticket.id} closed`,
@@ -310,7 +310,7 @@ async function notifyCommentAdded(ticket, comment, commenter, creator, assignee)
     `"${preview}"\n\n` +
     `View: ${ticketUrl}`;
 
-  await transporter.sendMail({
+  await sendMail({
     from: FROM,
     to: `"${recipient.name}" <${recipient.email}>`,
     subject: `[HelpDesk] New reply on ticket #${ticket.id}: ${ticket.title}`,

@@ -26,5 +26,6 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Helpdesk API running on port ${PORT}`);
+  console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000 (default)'}`);
   startPurgeJob();
 });

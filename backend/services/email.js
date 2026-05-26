@@ -1,8 +1,6 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  logger: true,
-  debug: true,
   host: process.env.SMTP_HOST || 'localhost',
   port: parseInt(process.env.SMTP_PORT) || 25,
   secure: process.env.SMTP_SECURE === 'true', // true for port 465, false for 25/587
@@ -20,14 +18,27 @@ const transporter = nodemailer.createTransport({
     process.env.SMTP_REJECT_UNAUTHORIZED === 'true',
 },
 });
-transporter.verify((err, success) => {
+transporter.verify((err) => {
   if (err) {
-    console.error('SMTP VERIFY FAILED');
-    console.error(err);
+    console.error('[email] SMTP verify failed:', err.message);
   } else {
-    console.log('SMTP SERVER READY');
+    console.log('[email] SMTP ready');
   }
 });
+
+async function sendMail(options) {
+  const to = options.to;
+  const subject = options.subject;
+  console.log(`[email] sending to=${to} subject="${subject}"`);
+  try {
+    const info = await transporter.sendMail(options);
+    console.log(`[email] sent    to=${to} messageId=${info.messageId}`);
+    return info;
+  } catch (err) {
+    console.error(`[email] failed  to=${to} subject="${subject}" error=${err.message}`);
+    throw err;
+  }
+}
 /**
  * Send an email confirmation link to a newly registered user.
  * @param {string} toEmail - Recipient email address
@@ -103,7 +114,7 @@ async function sendConfirmationEmail(toEmail, toName, token) {
     </div>
   `;
 
-  await transporter.sendMail({
+  await sendMail({
     from: `"${smtpName}" <${smtpEmail}>`,
     to: `"${toName}" <${toEmail}>`,
     subject: 'Confirm your HelpDesk account',
@@ -188,7 +199,7 @@ async function sendPasswordResetEmail(toEmail, toName, token) {
     </div>
   `;
 
-  await transporter.sendMail({
+  await sendMail({
     from: `"${smtpName}" <${smtpEmail}>`,
     to: `"${toName}" <${toEmail}>`,
     subject: 'Reset your HelpDesk password',
@@ -204,4 +215,4 @@ If you didn't request a password reset, ignore this email — your password will
   });
 }
 
-module.exports = { transporter, sendConfirmationEmail, sendPasswordResetEmail };
+module.exports = { transporter, sendMail, sendConfirmationEmail, sendPasswordResetEmail };
