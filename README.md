@@ -1,4 +1,4 @@
-# HelpDesk MVP
+# HelpDesk
 
 A self-hosted ticketing system with integrated knowledge base.
 Built with Node.js + Express, React, and PostgreSQL — runs entirely in Docker.
@@ -11,25 +11,32 @@ Built with Node.js + Express, React, and PostgreSQL — runs entirely in Docker.
 helpdesk/
 ├── backend/
 │   ├── db/
-│   │   ├── index.js        # PostgreSQL connection pool
-│   │   └── schema.sql      # Database tables (auto-run on first start)
+│   │   ├── index.js          # PostgreSQL connection pool
+│   │   ├── schema.sql        # Database tables (auto-run on first start)
+│   │   └── migrations/       # Incremental schema changes for existing DBs
 │   ├── middleware/
-│   │   └── auth.js         # JWT authentication & role checks
+│   │   └── auth.js           # JWT authentication & role checks
 │   ├── routes/
-│   │   ├── auth.js         # Login, register, /me
-│   │   ├── tickets.js      # Tickets, comments, attachments, KB links
-│   │   ├── kb.js           # Knowledge base articles
-│   │   └── users.js        # User management (admin)
-│   ├── uploads/            # Uploaded images (persisted via Docker volume)
-│   ├── server.js           # Express app entry point
+│   │   ├── auth.js           # Login, register, /me, forgot/reset password
+│   │   ├── tickets.js        # Tickets, comments, attachments, KB links, FTS
+│   │   ├── kb.js             # Knowledge base articles
+│   │   ├── announcements.js  # Site-wide announcement banners
+│   │   ├── dashboard.js      # Metrics & per-agent stats
+│   │   └── users.js          # User management (admin)
+│   ├── services/
+│   │   ├── notifications.js  # Email notification hooks
+│   │   ├── assignments.js    # Auto-assign new tickets to least-loaded agent
+│   │   └── purge.js          # Purge expired unconfirmed accounts (runs every 30 min)
+│   ├── uploads/              # Uploaded images (persisted via Docker volume)
+│   ├── server.js             # Express app entry point
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── api/client.js   # Axios with JWT injection
-│   │   ├── context/        # Auth context (global user state)
-│   │   ├── components/     # Layout (sidebar nav)
-│   │   └── pages/          # Login, Register, Tickets, KB pages
-│   ├── nginx.conf          # Nginx: serves React + proxies /api to backend
+│   │   ├── api/client.js     # Axios with JWT injection
+│   │   ├── context/          # Auth context (global user state)
+│   │   ├── components/       # Layout, AnnouncementBanner
+│   │   └── pages/            # Login, Register, Tickets, KB, Dashboard, Announcements pages
+│   ├── nginx.conf            # Nginx: serves React + proxies /api to backend
 │   └── Dockerfile
 ├── docker-compose.yml
 └── .env.example
@@ -76,7 +83,7 @@ via **My Account → Change Password**, or by editing the seed before first boot
 |-------|--------|
 | user  | Submit tickets, view own tickets, comment, attach images, browse KB |
 | agent | All of the above + view all tickets, update status/priority, assign tickets, post internal notes, write KB articles, link KB to tickets |
-| admin | All of the above + manage user roles |
+| admin | All of the above + manage user roles, post announcements, purge deleted tickets |
 
 New registrations default to the `user` role. Promote users to `agent` or `admin` via the Users page (admin only).
 
@@ -98,7 +105,7 @@ New registrations default to the `user` role. Promote users to `agent` or `admin
 ### Tickets
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| GET    | `/api/tickets`                  | List tickets (own for users, all for agents) | all |
+| GET    | `/api/tickets`                  | List tickets (own for users, all for agents); supports `?q=` for full-text search | all |
 | GET    | `/api/tickets/trash`            | List soft-deleted tickets | admin |
 | GET    | `/api/tickets/:id`              | Get ticket detail with comments & attachments | all |
 | POST   | `/api/tickets`                  | Create ticket (auto-assigns to least-loaded agent) | all |
@@ -118,6 +125,15 @@ New registrations default to the `user` role. Promote users to `agent` or `admin
 | POST   | `/api/kb` | Create article | agent, admin |
 | PATCH  | `/api/kb/:id` | Update article | agent, admin |
 | DELETE | `/api/kb/:id` | Delete article | admin |
+
+### Announcements
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| GET    | `/api/announcements`      | List active, non-expired banners | all |
+| GET    | `/api/announcements/all`  | Full list including inactive | admin |
+| POST   | `/api/announcements`      | Create announcement (`info`, `warning`, or `critical`) | admin |
+| PATCH  | `/api/announcements/:id`  | Update message, type, active state, or expiry | admin |
+| DELETE | `/api/announcements/:id`  | Permanently delete | admin |
 
 ### Dashboard
 | Method | Endpoint | Description | Roles |
@@ -180,15 +196,17 @@ docker compose exec -T db psql -U helpdesk_user helpdesk < backup.sql
 
 Shipped:
 - Email confirmation on registration + email notifications on ticket events
+- Confirmation email to ticket creator on submission
 - Self-service password reset (forgot-password flow)
 - Auto-assignment of new tickets to the least-loaded agent
 - Dashboard with team/personal metrics and per-agent productivity (admin view)
 - Soft delete + admin trash with restore / permanent delete
+- Full-text search on tickets (PostgreSQL `tsvector`, `?q=` param)
+- Site-wide announcement banners with `info`/`warning`/`critical` types and optional expiry
 
 Still on the roadmap:
-- **Full-text search** — PostgreSQL `tsvector` indexes for fast KB + ticket search
 - **AI KB suggestions** — when creating a ticket, call Claude API to suggest relevant KB articles inline
 - **SLA tracking** — flag tickets that have been open too long given their priority
 - **Email-to-ticket** — create tickets from inbound email (no login required)
-- **Filter & search on the ticket list** — chips for priority/assignee/category + text search
+- **Filter chips on the ticket list** — filter by priority/assignee/category
 - **Auth-endpoint rate limiting** — slow down brute-force attempts on login/register/forgot
