@@ -70,6 +70,48 @@ function metaTable(fields) {
 // ─── Notification functions ────────────────────────────────────────────────────
 
 /**
+ * Confirm to the ticket creator that their submission was received.
+ *
+ * @param {Object} ticket      - Full ticket row from DB.
+ * @param {Object} creator     - { email, name } of the submitting user.
+ */
+async function notifyTicketSubmitted(ticket, creator) {
+  if (!creator?.email) return;
+
+  const ticketUrl = `${BASE_URL}/tickets/${ticket.id}`;
+
+  const html = wrapEmail(`
+    <h2 style="margin-top:0;">We received your request</h2>
+    <p>Hi ${creator.name}, your support ticket has been submitted and our team will look into it shortly.</p>
+    <p><strong>${ticket.title}</strong></p>
+    ${metaTable({
+      'Ticket #':  `#${ticket.id}`,
+      'Priority':  ticket.priority,
+      'Category':  ticket.category || '—',
+      'Status':    'Open',
+    })}
+    <p style="color:#64748b;font-size:13px;">
+      You'll receive an email when the status changes or when someone replies.
+    </p>
+    ${ctaButton(ticketUrl, 'View Ticket')}
+  `);
+
+  const text =
+    `Hi ${creator.name},\n\n` +
+    `Your support ticket #${ticket.id} has been received: ${ticket.title}\n\n` +
+    `You'll be notified when the status changes or when someone replies.\n\n` +
+    `View: ${ticketUrl}`;
+
+  await sendMail({
+    from: FROM,
+    to: `"${creator.name}" <${creator.email}>`,
+    subject: `[HelpDesk] Ticket #${ticket.id} received: ${ticket.title}`,
+    html,
+    text,
+  });
+}
+
+/**
  * Send a "new ticket submitted" email to each recipient in the supplied list.
  * The caller decides who hears about new tickets — typically admins only,
  * since the auto-assigned agent gets a dedicated "assigned to you" email
@@ -320,6 +362,7 @@ async function notifyCommentAdded(ticket, comment, commenter, creator, assignee)
 }
 
 module.exports = {
+  notifyTicketSubmitted,
   notifyTicketCreated,
   notifyTicketAssigned,
   notifyStatusChanged,

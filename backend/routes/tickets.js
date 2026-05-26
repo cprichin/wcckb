@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { autoAssign } = require('../services/assignments');
 const {
+  notifyTicketSubmitted,
   notifyTicketCreated,
   notifyTicketAssigned,
   notifyStatusChanged,
@@ -197,6 +198,8 @@ router.post('/', authenticate, async (req, res) => {
     ]);
     const admins   = adminsResult.rows;
     const assignee = assigneeResult.rows[0] || null;
+
+    notifyTicketSubmitted(ticket, { email: req.user.email, name: req.user.name }).catch(console.error);
 
     if (admins.length) {
       notifyTicketCreated(ticket, req.user.name, admins).catch(console.error);
