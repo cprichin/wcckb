@@ -361,6 +361,49 @@ async function notifyCommentAdded(ticket, comment, commenter, creator, assignee)
   });
 }
 
+/**
+ * Confirm to the ticket submitter that their ticket was received.
+ *
+ * @param {Object} ticket   - Full ticket row (id, title, priority, category, status).
+ * @param {Object} creator  - { email, name } of the person who submitted it.
+ */
+async function notifyTicketSubmitted(ticket, creator) {
+  if (!creator?.email) return;
+
+  const ticketUrl = `${BASE_URL}/tickets/${ticket.id}`;
+
+  const html = wrapEmail(`
+    <h2 style="margin-top:0;">We received your ticket</h2>
+    <p>Hi ${creator.name}, your support request has been submitted and will be reviewed shortly.</p>
+    <p><strong>${ticket.title}</strong></p>
+    ${metaTable({
+      'Ticket #':  `#${ticket.id}`,
+      'Priority':  ticket.priority,
+      'Category':  ticket.category || '—',
+      'Status':    ticket.status,
+    })}
+    ${ctaButton(ticketUrl, 'View Your Ticket')}
+    <p style="color:#64748b;font-size:13px;">
+      You'll receive updates here when the status changes or an agent replies.
+    </p>
+  `);
+
+  const text =
+    `Hi ${creator.name},\n\n` +
+    `Your ticket #${ticket.id} has been received: ${ticket.title}\n` +
+    `Priority: ${ticket.priority}\n\n` +
+    `You'll be notified when the status changes or an agent replies.\n\n` +
+    `View your ticket: ${ticketUrl}`;
+
+  await sendMail({
+    from: FROM,
+    to: `"${creator.name}" <${creator.email}>`,
+    subject: `[HelpDesk] Ticket #${ticket.id} received: ${ticket.title}`,
+    html,
+    text,
+  });
+}
+
 module.exports = {
   notifyTicketSubmitted,
   notifyTicketCreated,
