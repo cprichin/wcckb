@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 const ROLE_COLOR = { admin: '#7c3aed', agent: '#0369a1', user: '#374151' };
 const ROLE_BG   = { admin: '#f3e8ff', agent: '#e0f2fe', user: '#f1f5f9' };
 
-const BLANK = { name: '', email: '', password: '', role: 'user', department: '' };
+const BLANK = { name: '', email: '', password: '', role: 'user' };
 
 export default function AdminUsers() {
   const { user: me } = useAuth();
@@ -108,9 +108,6 @@ const handleConfirm = async (userId) => {
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="They can change this after login" required />
               </label>
-              <label>Department <span className="optional">(optional)</span>
-                <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
-              </label>
             </div>
             <label style={{ maxWidth: 200 }}>Role *
               <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
@@ -138,7 +135,6 @@ const handleConfirm = async (userId) => {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
-                <th>Department</th>
                 <th>Role</th>
                 <th>Confirmed</th>
                 <th>Joined</th>
@@ -153,7 +149,6 @@ const handleConfirm = async (userId) => {
                     {u.id === me?.id && <span className="you-badge">you</span>}
                   </td>
                   <td className="email-cell">{u.email}</td>
-                  <td>{u.department || <span className="muted">—</span>}</td>
                   <td>
                     {u.id === me?.id ? (
                       <span className="role-pill" style={{ background: ROLE_BG.admin, color: ROLE_COLOR.admin }}>

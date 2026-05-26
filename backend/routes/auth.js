@@ -13,7 +13,7 @@ function generateToken() {
 
 // POST /api/auth/register — self-registration (always role: user)
 router.post('/register', async (req, res) => {
-  const { name, email, password, department } = req.body;
+  const { name, email, password } = req.body;
   if (!name || !email || !password)
     return res.status(400).json({ error: 'name, email, and password are required' });
 
@@ -24,11 +24,11 @@ router.post('/register', async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO users
-         (name, email, password_hash, role, department,
+         (name, email, password_hash, role,
           email_confirmed, confirmation_token, confirmation_expires_at)
-       VALUES ($1, $2, $3, 'user', $4, FALSE, $5, $6)
+       VALUES ($1, $2, $3, 'user', FALSE, $4, $5)
        RETURNING id, name, email, role`,
-      [name, email, hash, department || null, token, expires]
+      [name, email, hash, token, expires]
     );
 
     // Send confirmation email — if it fails, delete the account and surface the error
@@ -125,7 +125,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, name, email, role, department, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     res.json(result.rows[0]);

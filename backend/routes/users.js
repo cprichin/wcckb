@@ -13,7 +13,7 @@ function generateToken() {
 router.get('/', authenticate, authorize('admin'), async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, name, email, role, department, email_confirmed, created_at
+      `SELECT id, name, email, role, email_confirmed, created_at
        FROM users ORDER BY created_at DESC`
     );
     res.json(result.rows);
@@ -38,7 +38,7 @@ router.get('/agents', authenticate, authorize('agent', 'admin'), async (req, res
 
 // POST /api/users — admin creates a user with any role directly
 router.post('/', authenticate, authorize('admin'), async (req, res) => {
-  const { name, email, password, role, department } = req.body;
+  const { name, email, password, role } = req.body;
   if (!name || !email || !password || !role)
     return res.status(400).json({ error: 'name, email, password, and role are required' });
   if (!['user', 'agent', 'admin'].includes(role))
@@ -51,11 +51,11 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO users
-         (name, email, password_hash, role, department,
+         (name, email, password_hash, role,
           email_confirmed, confirmation_token, confirmation_expires_at)
-       VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
-       RETURNING id, name, email, role, department, created_at`,
-      [name, email, hash, role, department || null, token, expires]
+       VALUES ($1, $2, $3, $4, FALSE, $5, $6)
+       RETURNING id, name, email, role, created_at`,
+      [name, email, hash, role, token, expires]
     );
 
     // Send confirmation email

@@ -46,8 +46,6 @@ export default function MyAccount() {
           <span>{user?.name}</span>
           <span className="profile-label">Email</span>
           <span>{user?.email}</span>
-          <span className="profile-label">Department</span>
-          <span>{user?.department || <span className="muted">—</span>}</span>
           <span className="profile-label">Role</span>
           <span className="role-pill" style={{
             background: user?.role === 'admin' ? '#f3e8ff' : user?.role === 'agent' ? '#e0f2fe' : '#f1f5f9',

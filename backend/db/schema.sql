@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS users (
   email       VARCHAR(150) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role        VARCHAR(20) NOT NULL DEFAULT 'user', -- 'user', 'agent', 'admin'
-  department  VARCHAR(100),
   email_confirmed         BOOLEAN     NOT NULL DEFAULT FALSE,
   confirmation_token      TEXT        UNIQUE,
   confirmation_expires_at TIMESTAMPTZ,

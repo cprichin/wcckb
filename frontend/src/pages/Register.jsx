@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', department: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -58,9 +58,6 @@ export default function Register() {
           </label>
           <label>Password
             <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
-          </label>
-          <label>Department <span className="optional">(optional)</span>
-            <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
           </label>
           <button type="submit" disabled={loading} className="btn primary full">
             {loading ? 'Creating…' : 'Create Account'}
