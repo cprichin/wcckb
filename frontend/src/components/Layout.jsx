@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AnnouncementBanner from './AnnouncementBanner';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -42,6 +43,11 @@ export default function Layout({ children }) {
               🗑 Trash
             </NavLink>
           )}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin/announcements" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              📢 Announcements
+            </NavLink>
+          )}
           <NavLink to="/account" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             👤 My Account
           </NavLink>
@@ -55,6 +61,7 @@ export default function Layout({ children }) {
         </div>
       </nav>
       <main className="main-content">
+        <AnnouncementBanner />
         {children}
       </main>
     </div>

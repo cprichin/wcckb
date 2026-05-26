@@ -77,6 +77,23 @@ input:focus, textarea:focus, select:focus { border-color: #3b82f6; background: #
 .card h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
   color: #94a3b8; margin-bottom: 12px; }
 
+/* ── Announcement Banner ── */
+.announcement-stack { margin: -24px -24px 20px -24px; }
+.announcement-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 20px; border-left: 4px solid;
+  font-size: 14px; line-height: 1.5;
+}
+.announcement-banner + .announcement-banner { border-top: 1px solid rgba(0,0,0,.06); }
+.announcement-icon { font-size: 15px; flex-shrink: 0; padding-top: 1px; }
+.announcement-message { flex: 1; }
+.announcement-dismiss {
+  flex-shrink: 0; background: none; border: none;
+  font-size: 22px; line-height: 1; opacity: .45;
+  padding: 0 2px; transition: opacity .15s; cursor: pointer;
+}
+.announcement-dismiss:hover { opacity: 1; }
+
 /* ── Alerts ── */
 .alert { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
 .alert.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
